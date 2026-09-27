@@ -1,14 +1,25 @@
-# macOS 27でng-utf8をHomebrewからビルドした記録
+# macOS 27でng-utf8をインストールする方法：Homebrew Formulaの修正記録
+[English](README-en.md)
+
+macOS 27 に更新後、それまで使っていた ng がエラーで起動しなくなった。macOS 26 までは動作していた。以前の ng は Intel Mac でコンパイルしたと記憶しているが、この点は確認できていない。
+
+そこで Homebrew の `ng-utf8` をインストールし直そうとしたところ、次の二つの問題が起きた。
+
+1. `configure` がコンパイラの確認に使う `main(){return(0);}` は戻り値の型を書いていない。今回の Clang はこれをエラーとし、コンパイラ確認の段階で停止した。Formula の `CFLAGS` に `-Wno-error=implicit-int` を加えると、この段階を通過した。
+2. コンパイルと `make install` の成功後、Formula が使用する `File.exists?` に対して Homebrew の Ruby が `NoMethodError` を返した。`File.exists?` は Ruby 3.2 で削除されたメソッドであり、`File.exist?` に修正するとインストールが完了した。
+
+したがって、この手順で修正したのは、今回確認できたビルド時とインストール処理時の問題である。以前の ng が使えなくなった直接の原因を特定したものではない。
 
 ## 確認した環境
 
-- MacBook Pro 14インチ、M4 Pro
+記録した機種は MacBook Pro 14インチの M4 Pro と M2 Pro である。次のバージョンは M4 Pro で記録したものである。
+
 - macOS 27.0（arm64）
 - Homebrew 7.0.6（`git describe`: `7.0.6-38-g27af95f6a3`）
 - Apple Command Line Tools 27.0、Clang 21.0.0
 - ng-utf8 1.5beta1（`matchy256/matchy/ng-utf8`）
 
-この環境で、以下の修正を加えた後、Homebrewによるビルドとインストールが完了した。確認できたのはビルドとインストールまでであり、起動、日本語の読み書き、別のMacでの再現は、この記録では検証していない。
+M4 Pro のこの環境で、以下の修正を加えた後、Homebrewによるビルドとインストールが完了した。M2 Pro については、OS・ツールのバージョンと、どの操作まで確認したかをこの記録には残していない。
 
 ## 手順
 
@@ -25,7 +36,7 @@ brew update
 
 `brew update` は、次の手順でFormulaをローカル編集する前に実行する。
 
-その後、Homebrewが認識したFormula名とローカルのtapディレクトリは `matchy256/matchy/ng-utf8` および `matchy256/homebrew-matchy` だった。ローカルのtapの取得元は `https://github.com/matchy256/homebrew-matchy.git` で、`https://github.com/matchy2/homebrew-matchy` へのアクセスはGitHub上で `matchy256/homebrew-matchy` へ転送される（2026年9月24日確認）。ただし、新規環境で `brew tap matchy2/matchy` または `brew tap matchy256/matchy` を実行した場合に同じ結果になるかは、今回の記録では未検証。
+その後、Homebrewが認識したFormula名とローカルのtapディレクトリは `matchy256/matchy/ng-utf8` および `matchy256/homebrew-matchy` だった。ローカルのtapの取得元は `https://github.com/matchy256/homebrew-matchy.git` で、`https://github.com/matchy2/homebrew-matchy` へのアクセスはGitHub上で `matchy256/homebrew-matchy` へ転送される（2026年9月24日確認）。ただし、新規環境で `brew tap matchy2/matchy` または `brew tap matchy256/matchy` を実行した場合に同じ結果になるかは、今回の記録では未検証。Homebrewが認識したFormula名が `matchy256/matchy/ng-utf8` と異なる場合は、以降のコマンドを実行する前に、Formula名とtapの取得元を確認する。
 
 ```sh
 brew trust --formula matchy256/matchy/ng-utf8
@@ -34,6 +45,7 @@ brew trust --formula matchy256/matchy/ng-utf8
 ### 2. ローカルのFormulaを修正する
 
 次のコマンドで、Formulaをnanoで開く。
+viで開きたいなら、nano を vi に変更する。
 
 ```sh
 HOMEBREW_EDITOR=nano brew edit matchy256/matchy/ng-utf8
@@ -63,7 +75,7 @@ File.exists?  →  File.exist?
 +    unless (File.exist?(homerc)) then
 ```
 
-修正対象のFormulaは、今回の環境では次の場所にあった。
+なお、修正対象のFormulaは、今回の環境では次の場所にある。
 
 ```text
 /opt/homebrew/Library/Taps/matchy256/homebrew-matchy/Formula/ng-utf8.rb
@@ -100,7 +112,7 @@ brew install --keep-tmp matchy256/matchy/ng-utf8
 
 ### ngとUTF-8対応版
 
-- MURAMATSU Atsushi, [ng（GitHubリポジトリ）](https://github.com/amuramatsu/ng) — `LICENSE`、`COPYING`、ソースを確認するための資料。今回のFormulaは、GitHubではなく `http://tt.sakura.ne.jp/~amura/archives/ng/ng-1.5beta1.tar.gz` からソースを取得する。
+- MURAMATSU Atsushi, [ng（GitHubリポジトリ）](https://github.com/amuramatsu/ng) — `LICENSE`、`COPYING`、ソースを確認するための資料。今回のFormulaは、`brew install` の実行時に、GitHubではなく `http://tt.sakura.ne.jp/~amura/archives/ng/ng-1.5beta1.tar.gz` からソースを取得する。
 - [ng UTF-8 対応版（薄明日記、2005年）](https://startide.jp/diary/?2005/1/10/2) — Mac OS X向けの初期のUTF-8対応版に関する記録。今回のFormulaが適用するUTF-8パッチとの関係は、この記録では確認していない。
 - matchy, [私家版Homebrew：Ng-utf8](https://tech.matchy.net/archives/344) — 今回利用したHomebrew版の紹介。`brew tap matchy2/matchy` の出典。
 - jm8tsj, [ng editor インストール（Mac mini M1 OS 12.6下）](https://jm8tsj.com/2024/02/23/ng-editor-install-with-homebew/) — 旧環境でのインストール例。
@@ -111,8 +123,9 @@ brew install --keep-tmp matchy256/matchy/ng-utf8
 - Homebrew, [Tap Trust](https://docs.brew.sh/Tap-Trust) — `brew trust --formula` の説明。
 - Clang, [Diagnostic flags in Clang](https://clang.llvm.org/docs/DiagnosticsReference.html) — `-Wimplicit-int` の診断内容。
 - Ruby, [File.exist?](https://docs.ruby-lang.org/ja/latest/method/File/s/exist%3D3f.html) — Formulaで使用するファイル存在確認メソッド。
+- Ruby, [Ruby 3.2.0 Released](https://www.ruby-lang.org/en/news/2022/12/25/ruby-3-2-0-released/) — 「Removed methods」に、削除された非推奨メソッドとして `File.exists?` が記載されている（2026年9月27日閲覧）。
 
-最終閲覧日：2026年9月24日。
+最終閲覧日：2026年9月24日（閲覧日を個別に記した資料を除く）。
 
 ## 著作者とライセンス
 
